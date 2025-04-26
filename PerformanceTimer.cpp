@@ -1,28 +1,35 @@
-#include <windows.h>
+#include <chrono>
 
-_LARGE_INTEGER tickFrequency, counterStart, counterEnd, dummyCounter;
+std::chrono::time_point<std::chrono::high_resolution_clock> counterStart, counterEnd, dummyCounter;
 
 double GetTimeDeltaMs()
 {
-  //QueryPerformanceFrequency(&tickFrequency);
-  return (double)((counterEnd.QuadPart - counterStart.QuadPart) * 1000) / (double)tickFrequency.QuadPart;
+  auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(counterEnd - counterStart);
+
+  double milliseconds = (double)microseconds.count() / 1000;
+
+  return milliseconds;
 }
 
 void StartPerformanceTimer()
 {
-  QueryPerformanceCounter(&counterStart);
+  counterStart = std::chrono::high_resolution_clock::now();
 }
 
 void StopPerformanceTimer()
 {
-  QueryPerformanceCounter(&counterEnd);
+  counterEnd = std::chrono::high_resolution_clock::now();
 }
 
 double GetPerformanceTimerOverheadMs()
 {
-  QueryPerformanceCounter(&counterStart);
-  QueryPerformanceCounter(&dummyCounter);
-  //QueryPerformanceFrequency(&tickFrequency);
-  QueryPerformanceCounter(&counterEnd);
-  return (double)((counterEnd.QuadPart - counterStart.QuadPart) * 1000) / (double)tickFrequency.QuadPart;
+  StartPerformanceTimer();
+  dummyCounter = std::chrono::high_resolution_clock::now();
+  StopPerformanceTimer();
+
+  auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(counterEnd - counterStart);
+
+  double milliseconds = (double)microseconds.count() / 1000;
+
+  return milliseconds;
 }

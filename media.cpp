@@ -1,5 +1,4 @@
 #include "basetypes.h"
-#include <windows.h>
 #include <string>
 #include "byteswap.h"
 #include "Bios.h"
@@ -56,14 +55,20 @@ void MediaInitMPE(const uint32 i)
     if(!loadStatus)
     {
       char tmp[1024];
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
       GetModuleFileName(NULL, tmp, 1024);
+#else
+      strcpy(tmp, "./");
+#endif
       string tmps(tmp);
       size_t idx = tmps.find_last_of('\\');
       if (idx != string::npos)
         tmps = tmps.substr(0, idx+1);
-      loadStatus = nuonEnv.mpe[i].LoadCoffFile((tmps+"minibios.cof").c_str(),false);
-      if(!loadStatus)
-        MessageBox(NULL,"Missing File!","Could not load minibios.cof",MB_OK);
+      loadStatus = nuonEnv.mpe[i].LoadCoffFile((tmps + "minibios.cof").c_str(), false);
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+      if (!loadStatus)
+        MessageBox(NULL, "Missing File!", "Could not load minibios.cof", MB_OK);
+#endif
     }
 
     nuonEnv.mpe[i].intvec1 = MINIBIOS_INTVEC1_HANDLER_ADDRESS;
@@ -76,14 +81,20 @@ void MediaInitMPE(const uint32 i)
     if(!loadStatus)
     {
       char tmp[1024];
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
       GetModuleFileName(NULL, tmp, 1024);
+#else
+      strcpy(tmp, "./");
+#endif
       string tmps(tmp);
       size_t idx = tmps.find_last_of('\\');
       if (idx != string::npos)
         tmps = tmps.substr(0, idx+1);
-      loadStatus = nuonEnv.mpe[i].LoadCoffFile((tmps+"minibiosX.cof").c_str(),false);
-      if(!loadStatus)
-        MessageBox(NULL,"Missing File!","Could not load minibiosX.cof",MB_OK);
+      loadStatus = nuonEnv.mpe[i].LoadCoffFile((tmps + "minibiosX.cof").c_str(), false);
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+      if (!loadStatus)
+        MessageBox(NULL, "Missing File!", "Could not load minibiosX.cof", MB_OK);
+#endif
     }
 
     nuonEnv.mpe[i].intvec1 = MINIBIOSX_INTVEC1_HANDLER_ADDRESS;
@@ -261,7 +272,7 @@ void MediaRead(MPE &mpe)
     if(!fileNameArray[handle].empty() && buffer && ((eMedia)fileModeArray[handle] != eMedia::MEDIA_WRITE))
     {
       FILE* inFile;
-      if(fopen_s(&inFile,fileNameArray[handle].c_str(),"rb") == 0)
+      if ((inFile = fopen(fileNameArray[handle].c_str(), "rb")) == 0)
       {
         void* pBuf = nuonEnv.GetPointerToMemory(mpe.mpeIndex, buffer);
         fseek(inFile,startblock*BLOCK_SIZE_DVD,SEEK_SET);
@@ -299,10 +310,10 @@ void MediaWrite(MPE &mpe)
     {
       //try to open the existing file for read/write without erasing the contents
       FILE* outFile;
-      if(fopen_s(&outFile,fileNameArray[handle].c_str(),"r+b") != 0)
+      if ((outFile = fopen(fileNameArray[handle].c_str(), "r+b")) != 0)
       {
         //try to create the file
-        if(fopen_s(&outFile,fileNameArray[handle].c_str(),"w+b") != 0)
+        if ((outFile = fopen(fileNameArray[handle].c_str(), "w+b")) != 0)
           outFile = nullptr;
       }
 

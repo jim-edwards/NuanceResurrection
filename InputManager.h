@@ -2,13 +2,18 @@
 #define InputManagerH
 
 #include "basetypes.h"
-#include <windows.h>
+#ifdef WIN32
 #include <tchar.h>
+#endif
 
 struct Joystick
 {
   GUID guid;
+#ifdef WIN32
   TCHAR tszName[MAX_PATH];
+#else
+  char tszName[MAX_PATH];
+#endif
 };
 
 class InputManager

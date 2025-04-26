@@ -1,19 +1,30 @@
 #include "basetypes.h"
 #include <ctime>
-#include <windows.h>
+#include <chrono>
+#ifdef _WINDOWS
 #include <mmsystem.h>
+#endif
 #include "byteswap.h"
 #include "NuonEnvironment.h"
 #include "timer.h"
 #include "mpe.h"
 
+#ifndef _WINDOWS
+typedef union {
+  struct {
+    uint32_t LowPart;
+    int32_t HighPart;
+  };
+  int64_t QuadPart;
+} _LARGE_INTEGER;
+#endif
+
 extern NuonEnvironment nuonEnv;
 
-extern _LARGE_INTEGER tickFrequency;
-_LARGE_INTEGER ticksAtBootTime;
+std::chrono::time_point<std::chrono::high_resolution_clock> ticksAtBootTime;
 
 //
-
+#ifdef _WINDOWS
 typedef LONG(CALLBACK* NTSETTIMERRESOLUTION)(IN ULONG DesiredTime,
 	IN BOOLEAN SetResolution,
 	OUT PULONG ActualTime);
@@ -78,21 +89,24 @@ static void restore_win_timer_resolution()
 	}
 }
 
+#endif
+
 //
 
 void InitializeTimingMethod(void)
 {
+#ifdef _WINDOWS
   set_lowest_possible_win_timer_resolution();
+#endif
 
-  const bool available = (QueryPerformanceFrequency((_LARGE_INTEGER *)&tickFrequency) != 0);
-  assert(available);
-
-  QueryPerformanceCounter((_LARGE_INTEGER *)&ticksAtBootTime);
+  ticksAtBootTime = std::chrono::high_resolution_clock::now();
 }
 
 void DeInitTimingMethod(void)
 {
+#ifdef _WINDOWS
   restore_win_timer_resolution();
+#endif
 }
 
 void TimeOfDay(MPE &mpe)
@@ -115,8 +129,8 @@ void TimeOfDay(MPE &mpe)
     time(&currTime);
     if(currTime != oldTime)
     {
-      localtime_s(&pcTime,&currTime);
-      _get_timezone(&offset);
+      localtime_r(&currTime, &pcTime);
+      offset = -pcTime.tm_gmtoff;
 
       oldTime = currTime;
     }
@@ -163,12 +177,12 @@ void TimeOfDay(MPE &mpe)
 
 uint64 useconds_since_start()
 {
-  _LARGE_INTEGER counter;  
-  QueryPerformanceCounter((_LARGE_INTEGER *)&counter);
+  std::chrono::time_point<std::chrono::high_resolution_clock> counter;
+  counter = std::chrono::high_resolution_clock::now();
 
-  const unsigned long long cur_tick = (unsigned long long)(counter.QuadPart - ticksAtBootTime.QuadPart);
-  return ((unsigned long long)tickFrequency.QuadPart < 100000000ull) ? (cur_tick * 1000000ull / (unsigned long long)tickFrequency.QuadPart)
-        : (cur_tick * 1000ull / ((unsigned long long)tickFrequency.QuadPart / 1000ull));
+  auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(counter - ticksAtBootTime);
+
+  return microseconds.count();
 }
 
 void TimeElapsed(MPE &mpe)

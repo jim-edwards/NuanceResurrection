@@ -1,19 +1,21 @@
 #ifndef timerH
 #define timerH
 
+#include <cstdint>
+
 class MPE;
 
 struct _currenttime {
-    __int32 sec;
-    __int32 min;
-    __int32 hour;
-    __int32 wday;
-    __int32 mday;
-    __int32 month;
-    __int32 year;
-    __int32 isdst;     /* flag: for definitions, see below */
-    __int32 timezone;  /* minutes west of Greenwich */
-    __int32 reserved[3]; /* reserved for future expansion */
+  int32_t sec;
+  int32_t min;
+  int32_t hour;
+  int32_t wday;
+  int32_t mday;
+  int32_t month;
+  int32_t year;
+  int32_t isdst;       /* flag: for definitions, see below */
+  int32_t timezone;    /* minutes west of Greenwich */
+  int32_t reserved[3]; /* reserved for future expansion */
 };
 
 void InitializeTimingMethod();

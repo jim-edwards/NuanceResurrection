@@ -8,7 +8,32 @@
 
 #ifdef LITTLE_ENDIAN
 
-__forceinline void SwapWordBytes(uint16 * const toswap)
+#ifdef __GNUC__
+#define __forceinline inline __attribute__((always_inline))
+
+#include <cstdint>
+#include <bit>
+
+uint16_t _byteswap_ushort(uint16_t value)
+{
+  return (value & 0xFF00) >> 8 | (value & 0x00FF) << 8;
+}
+
+uint64_t _byteswap_ulong(uint64_t value)
+{
+  return (value & 0xFFFFFFFF00000000) >> 32 | (value & 0x00000000FFFFFFFF) << 32;
+}
+
+// STD C++23
+//unsigned long _byteswap_ulong(unsigned long value)
+//{
+//  return std::byteswap(value);
+//}
+
+#endif
+
+    __forceinline void
+    SwapWordBytes(uint16 *const toswap)
 {
 #if 0 // old __fastcall dependent code
   __asm

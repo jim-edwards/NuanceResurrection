@@ -1,7 +1,7 @@
 #include "basetypes.h"
-#include <io.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <cstring>
 #include <cstdio>
 #include "byteswap.h"
@@ -14,22 +14,22 @@ bool MPE::LoadNuonRomFile(const char * const filename)
   uint32 offset;
 
   int handle;
-  if(_sopen_s(&handle,filename,O_RDONLY|O_BINARY,_SH_DENYWR,_S_IREAD) == 0 && handle >= 0)
+  if ((handle = open(filename, O_RDONLY | O_BINARY)) == 0 && handle >= 0)
   {
 check_for_bles:
-    bytesRead = _read(handle, linebuf, 16);
+    bytesRead = read(handle, linebuf, 16);
     if(bytesRead == 16)
     {
       if(strncmp(linebuf,"Bles",4) == 0)
       {
-        const long where = _tell(handle) - 16;
+        const long where = lseek(handle, 0, SEEK_CUR) - 16;
         //This is a BLES file, not a NUONROM-DISK file.
         if((linebuf[4] == 0) && linebuf[5] == 1)
         {
           //Version 1?  COFF offset value is at offset 0x52
-          bytesRead = _lseek(handle, 0x52 - 0x10, SEEK_CUR);
+          bytesRead = lseek(handle, 0x52 - 0x10, SEEK_CUR);
           
-          _read(handle, linebuf, 2);
+          read(handle, linebuf, 2);
           union {
             uint32 u32;
             struct { uint8 u8[4]; };
@@ -38,34 +38,34 @@ check_for_bles:
           intbuf.u8[0] = linebuf[1];
           intbuf.u8[1] = linebuf[0];
           offset = intbuf.u32;
-          _lseek(handle,where,SEEK_SET);
+          lseek(handle,where,SEEK_SET);
           goto load_coff_file;
         }
       }
       if(strncmp(linebuf,"NUONROM-DISK",12) == 0)
       {
         //skip to line containing "cd_app.cof"
-        bytesRead = _read(handle, linebuf, 48);
+        bytesRead = read(handle, linebuf, 48);
         if(bytesRead == 48)
         {
-          bytesRead = _read(handle, linebuf, 16);
+          bytesRead = read(handle, linebuf, 16);
           if(bytesRead == 16)
           {
             if(strncmp(linebuf,"cd_app.cof",10) == 0)
             {
-              bytesRead = _read(handle, &offset, 4);
+              bytesRead = read(handle, &offset, 4);
               SwapScalarBytes(&offset);
               uint32 length;
-              bytesRead = _read(handle, &length, 4);
+              bytesRead = read(handle, &length, 4);
               SwapScalarBytes(&length);
-              bytesRead = _read(handle, linebuf, 8);
-              _lseek(handle, 0, SEEK_SET);
+              bytesRead = read(handle, linebuf, 8);
+              lseek(handle, 0, SEEK_SET);
 
               if(bytesRead == 8)
               {
                 //seek to the file offset point
 load_coff_file:
-                bytesRead = _lseek(handle, offset, SEEK_CUR);
+                bytesRead = lseek(handle, offset, SEEK_CUR);
                 if(bytesRead != -1)
                 {
                   return LoadCoffFile(filename,true,handle);
@@ -78,15 +78,15 @@ load_coff_file:
             }
             else if(strncmp(linebuf,"nuon.run",8) == 0)
             {
-              bytesRead = _read(handle, &offset, 4);
+              bytesRead = read(handle, &offset, 4);
               SwapScalarBytes(&offset);
               uint32 length;
-              bytesRead = _read(handle, &length, 4);
+              bytesRead = read(handle, &length, 4);
               SwapScalarBytes(&length);
-              bytesRead = _read(handle, linebuf, 8);
+              bytesRead = read(handle, linebuf, 8);
               if(bytesRead == 8)
               {
-                bytesRead = _lseek(handle, offset, SEEK_SET);
+                bytesRead = lseek(handle, offset, SEEK_SET);
                 if(bytesRead != -1)
                 {
                   goto check_for_bles;
@@ -129,7 +129,7 @@ load_coff_file:
 
 failure:
   if (handle >= 0)
-    _close(handle);
+    close(handle);
 
   return false;
 }

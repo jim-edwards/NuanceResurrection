@@ -568,14 +568,20 @@ void InitBios(MPE &mpe)
   if(!loadStatus)
   {
     char tmp[1024];
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
     GetModuleFileName(NULL, tmp, 1024);
+#else
+    strcpy(tmp, "./");
+#endif
     string tmps(tmp);
     size_t idx = tmps.find_last_of('\\');
     if (idx != string::npos)
       tmps = tmps.substr(0, idx+1);
     loadStatus = nuonEnv.mpe[3].LoadCoffFile((tmps+"bios.cof").c_str(),false);
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
     if(!loadStatus)
       ::MessageBox(NULL,"Missing File!","Could not load bios.cof",MB_OK);
+#endif
   }
 
   //Reset MPEAlloc flags to reset values

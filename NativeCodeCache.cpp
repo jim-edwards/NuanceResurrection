@@ -1,12 +1,57 @@
 #include "basetypes.h"
-#include <windows.h>
 #include "mpe.h"
 #include "NativeCodeCache.h"
 #include "PageMap.h"
+#include <sys/mman.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #define x86Emit_MRM(mod,reg,rm) (*pEmitLoc++ = (((uint32)(mod) << 6) | ((uint32)(reg) << 3) | (uint32)(rm)))
 #define x86Emit_SIB(base, scale, index) (*pEmitLoc++ = (((uint32)(scale) << 6) | ((uint32)(index) << 3) | (base)))
 
+void* allocate_executable_memory(size_t numBytes) {
+  void* mem = nullptr;
+
+  // Ensure page alignment
+  size_t pageSize = sysconf(_SC_PAGESIZE);
+  if (posix_memalign(&mem, pageSize, numBytes) != 0) {
+    perror("posix_memalign failed");
+    return nullptr;
+  }
+
+  // Use mmap to apply execution permissions
+  mem = mmap(mem, numBytes, PROT_READ | PROT_WRITE | PROT_EXEC,
+    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  if (mem == MAP_FAILED) {
+    perror("mmap failed");
+    free(mem); // Free aligned memory in case of failure
+    return nullptr;
+  }
+
+  return mem;
+}
+
+void free_executable_memory(void* mem, size_t numBytes) {
+  if (mem) {
+    munmap(mem, numBytes);
+  }
+}
+
+void flush_instruction_cache(void* pEmitLoc, size_t numBytes) {
+  __builtin___clear_cache((char*)pEmitLoc, (char*)pEmitLoc + numBytes);
+}
+
+/*
+void flush_instruction_cache(void* pEmitLoc, size_t numBytes) {
+  size_t pageSize = sysconf(_SC_PAGESIZE);
+  void* alignedAddr = (void*)((uintptr_t)pEmitLoc & ~(pageSize - 1));
+
+  if (mprotect(alignedAddr, numBytes, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+    perror("mprotect failed");
+  }
+}
+*/
 
 NativeCodeCache::NativeCodeCache()
     : numBytes(5UL*1024UL*1024UL)
@@ -23,12 +68,12 @@ NativeCodeCache::NativeCodeCache(uint32 _numBytes/*, uint32 _desiredTLBEntries*/
 
 void NativeCodeCache::Init()
 {
-  ptrNativeCodeBuffer = (uint8 *)VirtualAlloc(NULL,numBytes,MEM_RESERVE | MEM_COMMIT,PAGE_EXECUTE_READWRITE/*PAGE_READWRITE*/); //!! pages are f.e. 64k wide, so this does not work
+  ptrNativeCodeBuffer = (uint8 *)allocate_executable_memory(numBytes); //!! pages are f.e. 64k wide, so this does not work
   pEmitLoc = ptrNativeCodeBuffer;
 
   if(ptrNativeCodeBuffer)
   {
-    FlushInstructionCache(GetCurrentProcess(), pEmitLoc, numBytes); //!! should not be necessary, as each code block is flushed independently below in ReleaseBuffer(), but do it in case that ReleaseBuffer() is not the only thing called after emitting code
+    flush_instruction_cache(pEmitLoc, numBytes); //!! should not be necessary, as each code block is flushed independently below in ReleaseBuffer(), but do it in case that ReleaseBuffer() is not the only thing called after emitting code
 
     warningThreshold = (uint32)(0.97 * numBytes);
   }
@@ -44,7 +89,7 @@ NativeCodeCache::~NativeCodeCache()
 {
   if(ptrNativeCodeBuffer)
   {
-    VirtualFree(ptrNativeCodeBuffer,0,MEM_RELEASE);
+    free_executable_memory(ptrNativeCodeBuffer, numBytes);
   }
 }
 
@@ -74,7 +119,7 @@ bool NativeCodeCache::ReleaseBuffer(NativeCodeCacheEntryPoint entryPoint, uint32
     MessageBox(NULL, "VirtualProtect failed", "VirtualProtect failed", MB_OK);
 #endif
   }*/
-  FlushInstructionCache(GetCurrentProcess(), entryPoint, newUsedBytes);
+  flush_instruction_cache(entryPoint, newUsedBytes);
 
   if(alignment)
   {
@@ -98,7 +143,7 @@ void NativeCodeCache::Flush()
     MessageBox(NULL, "VirtualProtect failed", "VirtualProtect failed", MB_OK);
 #endif
   }*/
-  FlushInstructionCache(GetCurrentProcess(), pEmitLoc, numBytes); //!! should not be necessary, as each code block is flushed independently below in ReleaseBuffer(), but do it in case that ReleaseBuffer() is not the only thing called after emitting code
+  flush_instruction_cache(pEmitLoc, numBytes); //!! should not be necessary, as each code block is flushed independently below in ReleaseBuffer(), but do it in case that ReleaseBuffer() is not the only thing called after emitting code
 }
 
 void NativeCodeCache::X86Emit_ModRegRM(const x86ModType modType, const x86ModReg regSpare, const uint32 base, const x86IndexReg index, const x86ScaleVal scale, const int32 disp)

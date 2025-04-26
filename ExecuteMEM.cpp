@@ -221,7 +221,7 @@ inline uint32 CalculateBilinearAddress(MPE &mpe, const uint32 control, uint32 x,
 }
 
 // leave __fastcall here!
-uint32 __fastcall GetBilinearAddress(const uint32 xy, const uint32 control)
+uint32 FASTCALL_START GetBilinearAddress(const uint32 xy, const uint32 control)
 {
   if (xy == 0) // quick computation possible?
     return 0;
@@ -487,7 +487,7 @@ void Execute_LoadVectorControlRegisterAbsolute(MPE &mpe, const uint32 pRegs[48],
 }
 
 // leave __fastcall here!
-void __fastcall _LoadPixelAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr)
+void FASTCALL_START _LoadPixelAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr)
 {
   const uint32 control = mpe->ba_control;
   uint32* const __restrict regs = mpe->regs+mpe->ba_reg_offset;
@@ -671,7 +671,7 @@ void Execute_LoadPixelAbsolute(MPE &mpe, const uint32 pRegs[48], const Nuance &n
 }
 
 // leave __fastcall here!
-void __fastcall _LoadPixelZAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr)
+void FASTCALL_START _LoadPixelZAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr)
 {
   const uint32 control = mpe->ba_control;
   uint32* const __restrict regs = mpe->regs+mpe->ba_reg_offset;
@@ -1243,7 +1243,7 @@ void Execute_StoreVectorControlRegisterAbsolute(MPE &mpe, const uint32 pRegs[48]
 }
 
 // leave __fastcall here!
-void __fastcall _StorePixelAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr)
+void FASTCALL_START _StorePixelAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr)
 {
   const uint32 control = mpe->ba_control;
   const uint32 * const __restrict regs = mpe->regs+mpe->ba_reg_offset;
@@ -1337,7 +1337,7 @@ void Execute_StorePixelAbsolute(MPE &mpe, const uint32 pRegs[48], const Nuance &
 }
 
 // leave __fastcall here!
-void __fastcall _StorePixelZAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr)
+void FASTCALL_START _StorePixelZAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr)
 {
   const uint32 control = mpe->ba_control;
   const uint32 * const __restrict regs = mpe->regs+mpe->ba_reg_offset;

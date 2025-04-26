@@ -1,5 +1,6 @@
 #include "basetypes.h"
 #include <cstdio>
+#include <stdio.h>
 #include "FlashEEPROM.h"
 
 void FlashEEPROM::WriteData(uint32 address, uint32 data1)
@@ -273,7 +274,7 @@ void FlashEEPROM::LockSector(uint32 address)
 void FlashEEPROM::LoadFromFile(const char * const fileName)
 {
   FILE *inFile;
-  if(fopen_s(&inFile,fileName,"rb") == 0)
+  if ((inFile = fopen(fileName, "rb")) == 0)
   {
     fseek(inFile,0,SEEK_END);
     uint32 fileLength = ftell(inFile) + 1;
@@ -294,7 +295,7 @@ void FlashEEPROM::LoadFromFile(const char * const fileName)
 void FlashEEPROM::SaveToFile(const char * const fileName)
 {
   FILE *outFile;
-  if(fopen_s(&outFile,fileName,"wb") == 0)
+  if ((outFile = fopen(fileName, "wb")) == 0)
   {
     for(uint32 i = 0; i < DEFAULT_EEPROM_SIZE; i++)
     {

@@ -2,17 +2,18 @@
 #define EXECUTE_MEM_H
 
 #include "mpe.h"
+#include "basetypes.h"
 
 void GenerateMirrorLookupTable();
 void GenerateSaturateColorTables();
 
 // leave all these __fastcalls alone, as these are used by the JIT to pass data in/out via registers
-void __fastcall _LoadPixelAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr);
-void __fastcall _LoadPixelZAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr);
-void __fastcall _StorePixelAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr);
-void __fastcall _StorePixelZAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr);
+void FASTCALL_START _LoadPixelAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr) FASTCALL_END;
+void FASTCALL_START _LoadPixelZAbsolute(MPE* const __restrict mpe, const void* const __restrict memPtr) FASTCALL_END;
+void FASTCALL_START _StorePixelAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr) FASTCALL_END;
+void FASTCALL_START _StorePixelZAbsolute(const MPE* const __restrict mpe, void* const __restrict memPtr) FASTCALL_END;
 
-uint32 __fastcall GetBilinearAddress(const uint32 xy, const uint32 control);
+uint32 FASTCALL_START GetBilinearAddress(const uint32 xy, const uint32 control) FASTCALL_END;
 
 NuanceHandlerProto Execute_Mirror;
 NuanceHandlerProto Execute_MV_SImmediate;

@@ -2,9 +2,7 @@
 
 #include <cstdio>
 #include <string>
-#include <windows.h>
 #include <Commctrl.h>
-#include <tchar.h>
 #include <commdlg.h>
 #include "external\glew-2.2.0\include\GL\glew.h"
 #include <GL/gl.h>
@@ -1215,7 +1213,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         (new_time >= last_time3 + nuonEnv.timer_rate[2]) && // did enough time pass for new audio data to be ready?
         ((nuonEnv.nuonAudioChannelMode & (ENABLE_WRAP_INT | ENABLE_HALF_INT)) != (nuonEnv.oldNuonAudioChannelMode & (ENABLE_WRAP_INT | ENABLE_HALF_INT))) && // was a new audio interrupt requested?
         ((((nuonEnv.mpe[0].intsrc & nuonEnv.mpe[0].inten1) | (nuonEnv.mpe[1].intsrc & nuonEnv.mpe[1].inten1) | (nuonEnv.mpe[2].intsrc & nuonEnv.mpe[2].inten1) | (nuonEnv.mpe[3].intsrc & nuonEnv.mpe[3].inten1)) & INT_AUDIO) == 0) && // & (INT_AUDIO | INT_COMMXMIT | INT_VIDTIMER) // are any audio interrupts still pending?
-        _InterlockedExchange(&nuonEnv.audio_buffer_played,0) == 1) // was an audio buffer already played since last cycle?
+        if (__atomic_exchange_n(&nuonEnv.audio_buffer_played, 0, __ATOMIC_SEQ_CST) == 1) // was an audio buffer already played since last cycle?
         {
           nuonEnv.audio_buffer_offset = (nuonEnv.nuonAudioChannelMode & ENABLE_HALF_INT) ? 0 : (nuonEnv.nuonAudioBufferSize >> 1); //!! ENABLE_HALF_INT leads to better sound in Tetris, although one would assume it should be ENABLE_WRAP_INT here
           nuonEnv.oldNuonAudioChannelMode = nuonEnv.nuonAudioChannelMode;

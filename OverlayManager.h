@@ -2,9 +2,9 @@
 #define OVERLAYMANAGER_H
 
 #include "basetypes.h"
-//#include "external\MurmurHash3.h"
+//#include "external/MurmurHash3.h"
 #define XXH_INLINE_ALL
-#include "external\xxhash.h"
+#include "external/xxhash.h"
 #include <list>
 
 class OverlayManager
@@ -38,12 +38,12 @@ public:
     overlayBuffer = nullptr;
   }
 
-  uint32 GetOverlaysInUse() const
+  uint32_t GetOverlaysInUse() const
   {
     return numOverlays;
   }
 
-  void SetOverlayBufferAndLength(const uint32* const buffer, const uint32 len)
+  void SetOverlayBufferAndLength(const uint32_t* const buffer, const uint32_t len)
   {
     overlayBuffer = buffer;
     overlayLength = len;
@@ -59,12 +59,12 @@ public:
   {
     bInvalidate = false;
 
-    const uint64 hash = Hash(overlayBuffer,overlayLength);
+    const uint64_t hash = Hash(overlayBuffer,overlayLength);
 
-    for(std::list<std::pair<uint32,uint64>>::iterator it = overlayLRU.begin(); it != overlayLRU.end(); ++it)
+    for(std::list<std::pair<uint32_t,uint64_t>>::iterator it = overlayLRU.begin(); it != overlayLRU.end(); ++it)
       if(it->second == hash)
       {
-        const uint32 idx = it->first;
+        const uint32_t idx = it->first;
         overlayLRU.erase(it);
         overlayLRU.push_front(std::pair<uint32,uint64>(idx,hash));
 
@@ -75,7 +75,7 @@ public:
 
     bInvalidate = true;
 
-    uint32 idx;
+    uint32_t idx;
     if(numOverlays < maxOverlays) // enough entries left? simply increase counter
     {
       idx = numOverlays++;
@@ -85,15 +85,15 @@ public:
       idx = overlayLRU.back().first;
       overlayLRU.pop_back();
     }
-    overlayLRU.push_front(std::pair<uint32,uint64>(idx,hash)); // push new element to beginning (=most recently used)
+    overlayLRU.push_front(std::pair<uint32_t,uint64_t>(idx,hash)); // push new element to beginning (=most recently used)
 
     return idx << overlayShift;
   }
 
 private:
-  static uint64 Hash(const uint32* data, const uint32 length)
+  static uint64_t Hash(const uint32* data, const uint32 length)
   {
-    const uint64 result
+    const uint64_t result
     //MurmurHash3_x86_32((void*)data, length, 0xdeadbeef, &result);
     = XXH3_64bits((void*)data, length);
     return (result == 0) ? 1 : result; // must remove 0, as this is used for init'ing the tables
@@ -116,14 +116,14 @@ private:
     return ~result;*/
   }
 
-  uint32 numOverlays;
-  uint32 maxOverlays; // dependent on overlayLength, so at the moment 128 or 256, more is not possible for Aries 2
-  uint8  overlayShift;// dependent on overlayLength, so at the moment 12 or 13
+  uint32_t numOverlays;
+  uint32_t maxOverlays; // dependent on overlayLength, so at the moment 128 or 256, more is not possible for Aries 2
+  uint8_t  overlayShift;// dependent on overlayLength, so at the moment 12 or 13
 
-  std::list<std::pair<uint32,uint64>> overlayLRU; // stores the idx of the overlay, and the 64bit-hash of that buffer
+  std::list<std::pair<uint32_t,uint64_t>> overlayLRU; // stores the idx of the overlay, and the 64bit-hash of that buffer
 
-  uint32 overlayLength; // 4096 or 8192, depending on which MPE of an Aries 2
-  const uint32* overlayBuffer;
+  uint32_t overlayLength; // 4096 or 8192, depending on which MPE of an Aries 2
+  const uint32_t* overlayBuffer;
 
   //uint32 crctab[256];
 };

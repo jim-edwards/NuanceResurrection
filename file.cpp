@@ -2,8 +2,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <cerrno>
+#include <unistd.h>
 #include <fcntl.h>
-#include <io.h>
 #include <cstdlib>
 #ifdef ENABLE_EMULATION_MESSAGEBOXES
 #include <windows.h>
@@ -55,7 +55,7 @@ static int fileDescriptors[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-
 
 static uint32 ConvertFlags(uint32 nuonFlags)
 {
-  uint32 result = nuonFlags & (_O_RDONLY|_O_WRONLY|O_RDWR|_O_APPEND);
+  uint32 result = nuonFlags & (O_RDONLY|O_WRONLY|O_RDWR|O_APPEND);
 
   if(nuonFlags & _FCREAT)
   {
@@ -95,27 +95,27 @@ static uint32 ConvertIFMT(uint32 hostIFMT)
   uint32 result = 0;
 
   //Convert MSVC file type flags to newlib format (fstat)
-  if(hostIFMT & _S_IFCHR)
+  if(hostIFMT & S_IFCHR)
   {
     result |= NUON_IFCHR;
   }
-  if(hostIFMT & _S_IFIFO)
+  if(hostIFMT & S_IFIFO)
   {
     result |= NUON_IFIFO;
   }
-  if(hostIFMT & _S_IFREG)
+  if(hostIFMT & S_IFREG)
   {
     result |= NUON_IFREG;
   }
-  if(hostIFMT & _S_IREAD)
+  if(hostIFMT & S_IREAD)
   {
     result |= NUON_S_IRUSR;
   }
-  if(hostIFMT & _S_IWRITE)
+  if(hostIFMT & S_IWRITE)
   {
     result |= NUON_S_IWUSR;
   }
-  if(hostIFMT & _S_IEXEC)
+  if(hostIFMT & S_IEXEC)
   {
     result |= NUON_S_IXUSR;
   }
@@ -151,7 +151,7 @@ void FileOpen(MPE &mpe)
   {
     access = ConvertFlags(access);
     //Windows will set the read-only flag after opening the file if _S_IWRITE is not specified within the mode bits
-    mode = ConvertFlags(mode) | _S_IWRITE;
+    mode = ConvertFlags(mode) | S_IWRITE;
 
     char* pPath = (char*)nuonEnv.GetPointerToMemory(mpe.mpeIndex, path);
     if(!strncmp("/iso9660/",pPath,9))
@@ -170,7 +170,7 @@ void FileOpen(MPE &mpe)
     ConvertSeparatorCharacters(name);
 
     int fd;
-    if(_sopen_s(&fd, name, access, _SH_DENYNO, mode & (_S_IWRITE | _S_IREAD)) == 0 && fd != -1)
+    if((fd = open(name, access, mode & (S_IWRITE | S_IREAD))) != -1)
     {
       fileDescriptors[index] = fd;
       mpe.regs[0] = fd;
@@ -192,7 +192,7 @@ void FileClose(MPE &mpe)
   int index;
   if((index = FindFileDescriptorIndex(fd)) >= 0)
   {
-    int result = _close(fileDescriptors[index]);
+    int result = close(fileDescriptors[index]);
     if(result != -1)
     {
       fileDescriptors[index] = -1;
@@ -218,7 +218,7 @@ void FileRead(MPE &mpe)
   if((index = FindFileDescriptorIndex(fd)) >= 0)
   {
     void* pBuf = nuonEnv.GetPointerToMemory(mpe.mpeIndex, buf);
-    int32 result = _read(fileDescriptors[index], pBuf, len);
+    int32 result = read(fileDescriptors[index], pBuf, len);
     if(result != -1)
     {
       mpe.regs[0] = result;
@@ -250,7 +250,7 @@ void FileWrite(MPE &mpe)
     if((index = FindFileDescriptorIndex(fd)) >= 0)
     {
       const void *pBuf = nuonEnv.GetPointerToMemory(mpe.mpeIndex, buf);
-      int32 result = _write(fileDescriptors[index], pBuf, len);
+      int32 result = write(fileDescriptors[index], pBuf, len);
       if(result != -1)
       {
         mpe.regs[0] = result;
@@ -321,19 +321,19 @@ void FileFstat(MPE &mpe)
   {
     if((/*index =*/ FindFileDescriptorIndex(fd)) >= 0)
     {
-      struct _stat32 st;
-      int32 result = _fstat32(fd, &st);
+      struct stat st;
+      int32 result = fstat(fd, &st);
       if(result != -1)
       {
-        pBuf->st_atime = st.st_atime;
+        pBuf->nuon_st_atime = st.st_atime;
         pBuf->st_blksize = 1;
         pBuf->st_blocks = st.st_size;
-        pBuf->st_ctime = st.st_ctime;
+        pBuf->nuon_st_ctime = st.st_ctime;
         pBuf->st_dev = st.st_dev;
         pBuf->st_gid = st.st_gid;
         pBuf->st_ino = st.st_ino;
         pBuf->st_mode = ConvertIFMT(st.st_mode);
-        pBuf->st_mtime = st.st_mtime;
+        pBuf->nuon_st_mtime = st.st_mtime;
         pBuf->st_nlink = st.st_nlink;
         pBuf->st_rdev = st.st_rdev;
         pBuf->st_size = st.st_size;
@@ -344,9 +344,9 @@ void FileFstat(MPE &mpe)
         SwapWordBytes((uint16 *)&pBuf->st_gid);
         SwapWordBytes((uint16 *)&pBuf->st_uid);
         SwapWordBytes((uint16 *)&pBuf->st_rdev);
-        SwapScalarBytes((uint32 *)&pBuf->st_atime);
-        SwapScalarBytes((uint32 *)&pBuf->st_ctime);
-        SwapScalarBytes((uint32 *)&pBuf->st_mtime);
+        SwapScalarBytes((uint32 *)&pBuf->nuon_st_atime);
+        SwapScalarBytes((uint32 *)&pBuf->nuon_st_ctime);
+        SwapScalarBytes((uint32 *)&pBuf->nuon_st_mtime);
         SwapScalarBytes((uint32 *)&pBuf->st_ino);
         SwapScalarBytes((uint32 *)&pBuf->st_mode);
         SwapScalarBytes((uint32 *)&pBuf->st_size);
@@ -399,7 +399,7 @@ void FileLseek(MPE &mpe)
 
   if((/*index =*/ FindFileDescriptorIndex(fd)) >= 0)
   {
-    int32 result = _lseek(fd, offset, whence);
+    int32 result = lseek(fd, offset, whence);
     if(result != -1)
     {
       mpe.regs[0] = result;

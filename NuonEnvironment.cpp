@@ -2,7 +2,17 @@
 #ifdef ENABLE_EMULATION_MESSAGEBOXES
 #include <windows.h>
 #endif
-#include <Objbase.h>
+#include <string.h>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <uuid/uuid.h>
+#include <uuid>
+
+#ifndef ENABLE_EMULATION_MESSAGEBOXES
+#define FALSE 0
+#define TRUE 1
+#endif
 
 #include "GLWindow.h"
 #include "audio.h"
@@ -42,7 +52,7 @@ extern VidDisplay structMainDisplay;
 
     assert(len == (nuonEnv->nuonAudioBufferSize>>1));
 
-    _InterlockedExchange(&nuonEnv->audio_buffer_played, 1); // signal the NuanceMain loop that we did do some sound update
+    __atomic_exchange_n(&nuonEnv->audio_buffer_played, 1, __ATOMIC_SEQ_CST); // signal the NuanceMain loop that we did do some sound update
     ConvertNuonAudioData(pNuonAudioBuffer + nuonEnv->audio_buffer_offset, (uint8*)buff, len);
     return TRUE;
   }
@@ -369,10 +379,14 @@ void NuonEnvironment::Init()
   cfgFileName = "nuance.cfg";
 
   FILE* configFile;
-  if (fopen_s(&configFile, cfgFileName.c_str(), "r") != 0)
+  if ((configFile = fopen(cfgFileName.c_str(), "r")) != NULL)
   {
     char tmp[1024];
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
     GetModuleFileName(NULL, tmp, 1024);
+#else
+    strcpy(tmp, "./");
+#endif
     string tmps(tmp);
     size_t idx = tmps.find_last_of('\\');
     if (idx != string::npos)
@@ -392,9 +406,11 @@ void NuonEnvironment::Init()
 
   if (debugLogFileName)
   {
-    if (fopen_s(&debugLogFile, debugLogFileName, "at") != 0)
+    if ((debugLogFile = fopen(debugLogFileName, "at")) != NULL)
     {
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
       MessageBox(NULL, "Failed to open debug log file", "Failure", MB_OK);
+#endif
     }
   }
 
@@ -530,14 +546,14 @@ bool NuonEnvironment::StrToCtrlrBitnum(const char* str, unsigned int* bitnum)
 {
 #define CHECK_STR(s0, s1, i) \
 do { \
-  if (!_stricmp((s0), (s1))) \
+  if (strcasecmp((s0), (s1)) == 0) \
   { \
     *bitnum = (i); \
     return true; \
   } \
 } while (0)
 
-  if (!_strnicmp(str, "CPAD_", sizeof("CPAD_") - 1))
+  if (!strncasecmp(str, "CPAD_", sizeof("CPAD_") - 1))
   {
     const char* dir = str + sizeof("CPAD_") - 1;
     CHECK_STR(dir, "UP", CTRLR_BITNUM_BUTTON_C_UP);
@@ -545,7 +561,7 @@ do { \
     CHECK_STR(dir, "LEFT", CTRLR_BITNUM_BUTTON_C_LEFT);
     CHECK_STR(dir, "RIGHT", CTRLR_BITNUM_BUTTON_C_RIGHT);
   }
-  else if (!_strnicmp(str, "DPAD_", sizeof("DPAD_") - 1))
+  else if (!strncasecmp(str, "DPAD_", sizeof("DPAD_") - 1))
   {
     const char* dir = str + sizeof("DPAD_") - 1;
     CHECK_STR(dir, "UP", CTRLR_BITNUM_DPAD_UP);
@@ -572,7 +588,7 @@ bool NuonEnvironment::ParseJoyButtonConf(char buf[1025], unsigned int *bitnum, C
   char tmpBuf[1025];
 
   // strtok is destructive. Don't harm the original string.
-  strcpy_s(tmpBuf, buf);
+  strcpy_s(tmpBuf, sizeof(tmpBuf), buf);
 
   // Split on the equals sign.
   char *ctx = nullptr;
@@ -591,6 +607,22 @@ bool NuonEnvironment::ParseJoyButtonConf(char buf[1025], unsigned int *bitnum, C
   if (!StrToCtrlrBitnum(nuonName, bitnum)) return false;
 
   return ControllerButtonMapping::fromString(mappingName, mapping);
+}
+
+// Function to convert std::uuid to string
+std::string uuid_to_string(const std::uuid& uuid) {
+  std::ostringstream oss;
+  const auto& data = uuid;  // Access the raw data of std::uuid
+
+  // Format the UUID into a standard 8-4-4-4-12 hex format
+  for (size_t i = 0; i < 16; ++i) {
+    if (i == 4 || i == 6 || i == 8 || i == 10) {
+      oss << "-";  // Add hyphen between specific segments
+    }
+    oss << std::hex << std::setw(2) << std::setfill('0') << (int)data[i];
+  }
+
+  return oss.str();
 }
 
 ConfigTokenType NuonEnvironment::ReadConfigLine(FILE *file, char buf[1025])
@@ -627,46 +659,46 @@ bool NuonEnvironment::SaveConfigFile(const char* const fileName)
 {
   FILE* configFile;
 
-  if (fopen_s(&configFile, fileName ? fileName : cfgFileName.c_str(), "w") != 0)
+  if ((configFile = fopen(fileName ? fileName : cfgFileName.c_str(), "w")) != NULL)
     return false;
 
   // Don't save DVDBase. AFAICT, it is always overriden when loading a file, so no point in saving/loading it.
-  //fprintf_s(configFile, "[DVDBase]\n");
-  //fprintf_s(configFile, "%s\n\n", dvdBase);
+  //fprintf(configFile, "[DVDBase]\n");
+  //fprintf(configFile, "%s\n\n", dvdBase);
 
-  fprintf_s(configFile, "[AudioInterrupts]\n");
-  fprintf_s(configFile, "%s\n\n", bAudioInterruptsEnabled ? "Enabled" : "Disabled");
+  fprintf(configFile, "[AudioInterrupts]\n");
+  fprintf(configFile, "%s\n\n", bAudioInterruptsEnabled ? "Enabled" : "Disabled");
 
-  fprintf_s(configFile, "[DynamicCompiler]\n");
-  fprintf_s(configFile, "%s\n\n", compilerOptions.bAllowCompile ? "Enabled" : "Disabled");
+  fprintf(configFile, "[DynamicCompiler]\n");
+  fprintf(configFile, "%s\n\n", compilerOptions.bAllowCompile ? "Enabled" : "Disabled");
 
 #ifdef ENABLE_EMULATION_MESSAGEBOXES
-  fprintf_s(configFile, "[DumpCompiledBlocks]\n");
-  fprintf_s(configFile, "%s\n\n", compilerOptions.bDumpBlocks ? "Enabled" : "Disabled");
+  fprintf(configFile, "[DumpCompiledBlocks]\n");
+  fprintf(configFile, "%s\n\n", compilerOptions.bDumpBlocks ? "Enabled" : "Disabled");
 #endif
 
-  fprintf_s(configFile, "[CompilerDeadCodeElimination]\n");
-  fprintf_s(configFile, "%s\n\n", compilerOptions.bDeadCodeElimination ? "Enabled" : "Disabled");
+  fprintf(configFile, "[CompilerDeadCodeElimination]\n");
+  fprintf(configFile, "%s\n\n", compilerOptions.bDeadCodeElimination ? "Enabled" : "Disabled");
 
-  fprintf_s(configFile, "[CompilerConstantPropagation]\n");
-  fprintf_s(configFile, "%s\n\n", compilerOptions.bConstantPropagation ? "Enabled" : "Disabled");
+  fprintf(configFile, "[CompilerConstantPropagation]\n");
+  fprintf(configFile, "%s\n\n", compilerOptions.bConstantPropagation ? "Enabled" : "Disabled");
 
-  fprintf_s(configFile, "[T3KCompilerHack]\n");
-  fprintf_s(configFile, "%s\n\n", compilerOptions.bT3KCompilerHack ? "Enabled" : "Disabled");
+  fprintf(configFile, "[T3KCompilerHack]\n");
+  fprintf(configFile, "%s\n\n", compilerOptions.bT3KCompilerHack ? "Enabled" : "Disabled");
 
-  fprintf_s(configFile, "[AutomaticLoadPopup]\n");
-  fprintf_s(configFile, "%s\n\n", bAutomaticLoadPopup ? "Enabled" : "Disabled");
+  fprintf(configFile, "[AutomaticLoadPopup]\n");
+  fprintf(configFile, "%s\n\n", bAutomaticLoadPopup ? "Enabled" : "Disabled");
 
-  fprintf_s(configFile, "[UseCRTshader]\n");
-  fprintf_s(configFile, "%s\n\n", bUseCRTshader ? "Enabled" : "Disabled");
+  fprintf(configFile, "[UseCRTshader]\n");
+  fprintf(configFile, "%s\n\n", bUseCRTshader ? "Enabled" : "Disabled");
 
   if (debugLogFileName)
   {
-    fprintf_s(configFile, "[DebugLogFile]\n");
-    fprintf_s(configFile, "%s\n\n", debugLogFileName);
+    fprintf(configFile, "[DebugLogFile]\n");
+    fprintf(configFile, "%s\n\n", debugLogFileName);
   }
 
-  fprintf_s(configFile, "[Controller1Mappings]\n");
+  fprintf(configFile, "[Controller1Mappings]\n");
   for (size_t i = 0; i < _countof(controller1Mapping); i++)
   {
     const char* ctrlrStr;
@@ -725,11 +757,11 @@ bool NuonEnvironment::SaveConfigFile(const char* const fileName)
 
     char mappingStr[ControllerButtonMapping::MAPPING_STRING_SIZE];
     controller1Mapping[i].toString(mappingStr, _countof(mappingStr));
-    fprintf_s(configFile, "%s = %s\n", ctrlrStr, mappingStr);
+    fprintf(configFile, "%s = %s\n", ctrlrStr, mappingStr);
   }
-  fprintf_s(configFile, "\n");
+  fprintf(configFile, "\n");
 
-  fprintf_s(configFile, "[Controller1GUID]\n");
+  fprintf(configFile, "[Controller1GUID]\n");
 
   LPOLESTR guidWStr;
   char guidStr[100];
@@ -738,7 +770,7 @@ bool NuonEnvironment::SaveConfigFile(const char* const fileName)
   wcstombs_s(&convSize, guidStr, _countof(guidStr), guidWStr, _countof(guidStr) - 1);
   CoTaskMemFree(guidWStr);
 
-  fprintf_s(configFile, "%s\n", guidStr);
+  fprintf(configFile, "%s\n", guidStr);
 
   fclose(configFile);
   return true;
@@ -747,7 +779,7 @@ bool NuonEnvironment::SaveConfigFile(const char* const fileName)
 bool NuonEnvironment::LoadConfigFile(const std::string& fileName)
 {
   FILE* configFile;
-  if (fopen_s(&configFile, fileName.c_str(), "r") != 0)
+  if ((configFile = fopen(fileName.c_str(), "r")) != NULL)
     return false;
 
 
@@ -771,7 +803,7 @@ bool NuonEnvironment::LoadConfigFile(const std::string& fileName)
       case ConfigTokenType::CONFIG_COMMENT:
         break;
       case ConfigTokenType::CONFIG_VARIABLE_START:
-        if(_strnicmp(&line[1],"DVDBase]",sizeof("DVDBase]")) == 0)
+        if (strncasecmp(&line[1], "DVDBase]", sizeof("DVDBase]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
           ReplaceNewline(line,0,1024);
@@ -780,49 +812,49 @@ bool NuonEnvironment::LoadConfigFile(const std::string& fileName)
           dvdBase = new char[i+1];
           strcpy_s(dvdBase,i+1,line);
         }
-        else if(_strnicmp(&line[1],"AudioInterrupts]",sizeof("AudioInterrupts]")) == 0)
+        else if (strncasecmp(&line[1], "AudioInterrupts]", sizeof("AudioInterrupts]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          bAudioInterruptsEnabled = !_stricmp(line,"Enabled");
+          bAudioInterruptsEnabled = (strcasecmp(line, "Enabled") == 0);
         }
-        else if(_strnicmp(&line[1],"DynamicCompiler]",sizeof("DynamicCompiler]")) == 0)
+        else if (strncasecmp(&line[1], "DynamicCompiler]", sizeof("DynamicCompiler]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          compilerOptions.bAllowCompile = !_stricmp(line,"Enabled");
+          compilerOptions.bAllowCompile = (strcasecmp(line, "Enabled") == 0);
         }
 #ifdef ENABLE_EMULATION_MESSAGEBOXES
-        else if(_strnicmp(&line[1],"DumpCompiledBlocks]",sizeof("DumpCompiledBlocks]")) == 0)
+        else if (strncasecmp(&line[1], "DumpCompiledBlocks]", sizeof("DumpCompiledBlocks]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          compilerOptions.bDumpBlocks = !_stricmp(line,"Enabled");
+          compilerOptions.bDumpBlocks = (strcasecmp(line, "Enabled") == 0);
         }
 #endif
-        else if(_strnicmp(&line[1],"CompilerDeadCodeElimination]",sizeof("CompilerDeadCodeElimination]")) == 0)
+        else if (strncasecmp(&line[1], "CompilerDeadCodeElimination]", sizeof("CompilerDeadCodeElimination]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          compilerOptions.bDeadCodeElimination = !_stricmp(line,"Enabled");
+          compilerOptions.bDeadCodeElimination = (strcasecmp(line, "Enabled") == 0);
         }
-        else if(_strnicmp(&line[1],"CompilerConstantPropagation]",sizeof("CompilerConstantPropagation]")) == 0)
+        else if (strncasecmp(&line[1], "CompilerConstantPropagation]", sizeof("CompilerConstantPropagation]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          compilerOptions.bConstantPropagation = !_stricmp(line,"Enabled");
+          compilerOptions.bConstantPropagation = (strcasecmp(line, "Enabled") == 0);
         }
-        else if(_strnicmp(&line[1],"T3KCompilerHack]",sizeof("T3KCompilerHack]")) == 0)
+        else if (strncasecmp(&line[1], "T3KCompilerHack]", sizeof("T3KCompilerHack]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          compilerOptions.bT3KCompilerHack = !_stricmp(line,"Enabled");
+          compilerOptions.bT3KCompilerHack = (strcasecmp(line, "Enabled") == 0);
         }
-        else if(_strnicmp(&line[1],"AutomaticLoadPopup]",sizeof("AutomaticLoadPopup]")) == 0)
+        else if (strncasecmp(&line[1], "AutomaticLoadPopup]", sizeof("AutomaticLoadPopup]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          bAutomaticLoadPopup = !_stricmp(line,"Enabled");
+          bAutomaticLoadPopup = (strcasecmp(line, "Enabled") == 0);
         }
-        else if(_strnicmp(&line[1],"UseCRTshader]",sizeof("UseCRTshader]")) == 0)
+        else if (strncasecmp(&line[1], "UseCRTshader]", sizeof("UseCRTshader]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
-          bUseCRTshader = !_stricmp(line,"Enabled");
+          bUseCRTshader = (strcasecmp(line, "Enabled") == 0);
         }
-        else if (_strnicmp(&line[1],"DebugLogFile]",sizeof("DebugLogFile]")) == 0)
+        else if (strncasecmp(&line[1], "DebugLogFile]", sizeof("DebugLogFile]")) == 0)
         {
           tokenType = ReadConfigLine(configFile,line);
           ReplaceNewline(line, 0, 1024);
@@ -831,7 +863,7 @@ bool NuonEnvironment::LoadConfigFile(const std::string& fileName)
           debugLogFileName = new char[i+1];
           strcpy_s(debugLogFileName, i+1, line);
         }
-        else if(_strnicmp(&line[1],"Controller1Mappings]",sizeof("Controller1Mappings]")) == 0)
+        else if (strncasecmp(&line[1], "Controller1Mappings]", sizeof("Controller1Mappings]")) == 0)
         {
           while (true)
           {
@@ -852,7 +884,7 @@ bool NuonEnvironment::LoadConfigFile(const std::string& fileName)
             }
           }
         }
-        else if (_strnicmp(&line[1], "Controller1GUID]", sizeof("Controller1GUID]")) == 0)
+        else if (strncasecmp(&line[1], "Controller1GUID]", sizeof("Controller1GUID]")) == 0)
         {
           wchar_t guidStr[100];
           tokenType = ReadConfigLine(configFile, line);

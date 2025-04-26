@@ -3,10 +3,10 @@
 
 #include "basetypes.h"
 #include <climits>
-#include <windows.h>
 #include <string>
 #include <cstdio>
-#include "external\fmod-3.75\api\inc\fmod.h"
+#include <atomic>
+#include "external/fmod-3.75/api/inc/fmod.h"
 #include "audio.h"
 #include "mpe.h"
 #include "InputManager.h"
@@ -41,7 +41,7 @@ public:
   static const size_t MAPPING_STRING_SIZE = 7 + 2 + (2 * 10) + 1;
   void toString(char* strOut, size_t len) const
   {
-    sprintf_s(strOut, len, "%s_%d_%d", InputManager::InputTypeToStr(type), idx, subIdx);
+    snprintf(strOut, len, "%s_%d_%d", InputManager::InputTypeToStr(type), idx, subIdx);
   }
 
   static bool fromString(char* strIn, ControllerButtonMapping* mapping);
@@ -139,16 +139,17 @@ public:
     ScheduleInterrupt(INT_VIDTIMER);
   }
 
-  LONG schedule_intsrc;
+  std::atomic<uint32> schedule_intsrc;
 
-  inline void ScheduleInterrupt(const uint32 which)
+  inline void
+  ScheduleInterrupt(const uint32 which)
   {
-    _InterlockedOr(&schedule_intsrc,(LONG)which);
+    schedule_intsrc.fetch_or(which, std::memory_order_relaxed);
   }
 
   inline void TriggerScheduledInterrupts()
   {
-    const uint32 which = _InterlockedExchange(&schedule_intsrc,(LONG)0);
+    const uint32 which = schedule_intsrc;
     if(which)
     {
       for(int i = 0; i < 4; ++i)

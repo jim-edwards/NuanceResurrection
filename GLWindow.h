@@ -3,7 +3,6 @@
 
 #include "basetypes.h"
 #include "InputManager.h"
-#include <windows.h>
 
 #define bUseSeparateThread false
 

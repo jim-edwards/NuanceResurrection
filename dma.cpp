@@ -1768,8 +1768,12 @@ void DMADo(MPE &mpe)
     }
   }
   else
-    MessageBox(NULL,"Unhandled DMADo", "DMADo Error", MB_OK);
-}
+  {
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+    MessageBox(NULL, "Unhandled DMADo", "DMADo Error", MB_OK);
+#endif
+  }
+  }
 
 // as none of the games seem to use waitFlag == 0 above, AND all DMA emulation code is immediate at the moment, just do nothing
 void DMAWait(MPE &mpe)

@@ -1,7 +1,6 @@
 #include <string>
 #include <cstdio>
 #include "ShaderProgram.h"
-#include "Windows.h"
 
 ShaderProgram::ShaderProgram()
 {
@@ -70,8 +69,10 @@ void ShaderProgram::PrintInfoLog(GLhandleARB obj, const char *msg)
     GLchar *infoLog = new GLchar[blen];
     int32 slen = 0;   /* strlen actually written to buffer */
     glGetInfoLogARB(obj, blen, &slen, infoLog);
-    MessageBox(NULL,infoLog,msg,MB_OK);
-    delete [] infoLog;
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+    MessageBox(NULL, infoLog, msg, MB_OK);
+#endif
+    delete[] infoLog;
   }
 }
 
@@ -80,19 +81,23 @@ bool ShaderProgram::InstallShaderSourceFromFile(const char * const filename, GLe
   bool bStatus = false;
 
   FILE *inFile;
-  errno_t err = fopen_s(&inFile,filename,"rb");
-  if(err != 0)
+  inFile = fopen(filename, "rb");
+  if (inFile == NULL)
   {
     char tmp[1024];
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
     GetModuleFileName(NULL, tmp, 1024);
+#else
+    strcpy(tmp, "./");
+#endif
     std::string tmps(tmp);
     size_t idx = tmps.find_last_of('\\');
     if (idx != std::string::npos)
       tmps = tmps.substr(0, idx+1);
-    err = fopen_s(&inFile,(tmps + filename).c_str(),"rb");
+    inFile = fopen((tmps + filename).c_str(), "rb");
   }
 
-  if(err == 0)
+  if(inFile != NULL)
   {
     fseek(inFile,0,SEEK_END);
     const GLint length = ftell(inFile);

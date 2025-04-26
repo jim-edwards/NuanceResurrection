@@ -1,5 +1,6 @@
 #include "basetypes.h"
 #include <cstdlib>
+#include <x86intrin.h>
 #include "Handlers.h"
 #include "InstructionCache.h"
 #include "mpe.h"

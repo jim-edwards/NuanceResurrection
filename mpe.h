@@ -16,7 +16,7 @@
 
 #include "basetypes.h"
 #include "InstructionCache.h"
-#include "nativecodecache.h"
+#include "NativeCodeCache.h"
 #include "NuonMemoryMap.h"
 #include "OverlayManager.h"
 #include "Syscall.h"
@@ -234,7 +234,7 @@ typedef void (* NativeCodeBlockFunction)();
 extern const NuanceHandler nuanceHandlers[];
 
 // This assumes emulation of a Aries 2 MPE (for now), e.g. due to how the overlay code caching works (see OverlayManager)
-__declspec(align(16)) class MPE
+class alignas(16) MPE
 {
 public:
   union {

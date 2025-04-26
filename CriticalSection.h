@@ -1,8 +1,6 @@
 #ifndef CRITICALSECTION_H
 #define CRITICALSECTION_H
 
-#include <windows.h>
-
 class CriticalSection
 {
 public:

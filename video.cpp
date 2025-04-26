@@ -1,7 +1,6 @@
 #include "basetypes.h"
-#include <windows.h>
 #include <mutex>
-#include "external\glew-2.2.0\include\GL\glew.h"
+#include "external/glew-2.2.0/include/GL/glew.h"
 
 #include "GLWindow.h"
 #include "Bios.h"
@@ -740,7 +739,11 @@ render_main_buffer:
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       }
       else
-        MessageBox(NULL,"Failed to map main buffer","glMapBufferRange",MB_OK);
+      {
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+        MessageBox(NULL, "Failed to map main buffer", "glMapBufferRange", MB_OK);
+#endif
+      }
 
       glTexSubImage2D(TEXTURE_TARGET,0,0,0,structMainChannel.src_width,structMainChannel.src_height,mainExternalTextureFormat,mainPixelType, nullptr);
 
@@ -788,7 +791,11 @@ render_main_buffer:
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       }
       else
-        MessageBox(NULL,"Failed to map osd buffer","glMapBufferRange",MB_OK);
+      {
+#ifdef ENABLE_EMULATION_MESSAGEBOXES
+        MessageBox(NULL, "Failed to map osd buffer", "glMapBufferRange", MB_OK);
+#endif
+      }
 
       glTexSubImage2D(TEXTURE_TARGET,0,0,0,structOverlayChannel.src_width,structOverlayChannel.src_height,osdExternalTextureFormat,osdPixelType, nullptr);
 

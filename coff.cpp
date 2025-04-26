@@ -1,9 +1,12 @@
-#include <io.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include "mpe.h"
 #include "coff.h"
 #include "NuonEnvironment.h"
 #include "NuonMemoryMap.h"
+#include "byteswap.h"
 
 extern NuonEnvironment nuonEnv;
 
@@ -39,16 +42,18 @@ bool MPE::LoadCoffFile(const char * const filename, bool bSetEntryPoint, int han
 {
   if(handle == -1)
   {
-    if(_sopen_s(&handle, filename, O_RDONLY | O_BINARY, _SH_DENYWR, _S_IREAD) != 0 || handle == -1)
-        return false;
+    handle = open(filename, O_RDONLY);
+
+    if(handle <= -1)
+      return false;
   }
 
   if(handle >= 0)
   {
-    const int start_offset = _tell(handle);
+    const int start_offset = lseek(handle, 0, SEEK_CUR);
 
     FILHDR coffhdr;
-    _read(handle, &coffhdr, sizeof(FILHDR));
+    read(handle, &coffhdr, sizeof(FILHDR));
     coffhdr.f_magic = bswap16(coffhdr.f_magic);
     coffhdr.f_nscns = bswap16(coffhdr.f_nscns);
     coffhdr.f_timdat = bswap32(coffhdr.f_timdat);
@@ -63,14 +68,14 @@ bool MPE::LoadCoffFile(const char * const filename, bool bSetEntryPoint, int han
 
     //read the entry point, which is the first four bytes of the optional header
     uint32 entryPoint;
-    _read(handle, &entryPoint, 4);
+    read(handle, &entryPoint, 4);
     entryPoint = bswap32(entryPoint);
     //skip past the remainder of the optional header
-    _lseek(handle, (coffhdr.f_opthdr - 4), SEEK_CUR);
+    lseek(handle, (coffhdr.f_opthdr - 4), SEEK_CUR);
     while(coffhdr.f_nscns > 0)
     {
       SCNHDR sectionhdr;
-      _read(handle, &sectionhdr, sizeof(SCNHDR));
+      read(handle, &sectionhdr, sizeof(SCNHDR));
       sectionhdr.s_paddr = bswap32(sectionhdr.s_paddr);
       sectionhdr.s_vaddr = bswap32(sectionhdr.s_vaddr);
       sectionhdr.s_size = bswap32(sectionhdr.s_size);
@@ -97,16 +102,16 @@ bool MPE::LoadCoffFile(const char * const filename, bool bSetEntryPoint, int han
       }
 
       //save position so we can go to the section data
-      const long nextPos = _tell(handle);
+      const long nextPos = lseek(handle, 0, SEEK_CUR);
       //start_offset may not be 0 if loading a COFF image stored inside of
       //a NUONROM-DISK image
-      _lseek(handle,start_offset,SEEK_SET);
-      _lseek(handle,sectionhdr.s_scnptr,SEEK_CUR);
+      lseek(handle,start_offset,SEEK_SET);
+      lseek(handle,sectionhdr.s_scnptr,SEEK_CUR);
 
       if(sectionhdr.s_paddr < MAIN_BUS_BASE)
       {
         //assume local MPE memory
-        _read(handle,&dtrom[sectionhdr.s_paddr & MPE_VALID_MEMORY_MASK],sectionhdr.s_size);
+        read(handle,&dtrom[sectionhdr.s_paddr & MPE_VALID_MEMORY_MASK],sectionhdr.s_size);
       }
       else if(sectionhdr.s_paddr < SYSTEM_BUS_BASE)
       {
@@ -119,12 +124,12 @@ bool MPE::LoadCoffFile(const char * const filename, bool bSetEntryPoint, int han
           for(int i = 0; i < 16; i++)
             nuonEnv.mainBusDRAM[(sectionhdr.s_paddr & MAIN_BUS_VALID_MEMORY_MASK) + i] = 0;
 
-          _lseek(handle,16,SEEK_CUR);
-          _read(handle,&(nuonEnv.mainBusDRAM[(sectionhdr.s_paddr & MAIN_BUS_VALID_MEMORY_MASK) + 16]),sectionhdr.s_size - 16);
+          lseek(handle,16,SEEK_CUR);
+          read(handle,&(nuonEnv.mainBusDRAM[(sectionhdr.s_paddr & MAIN_BUS_VALID_MEMORY_MASK) + 16]),sectionhdr.s_size - 16);
         }
         else
         {
-          _read(handle,&(nuonEnv.mainBusDRAM[sectionhdr.s_paddr & MAIN_BUS_VALID_MEMORY_MASK]),sectionhdr.s_size);
+          read(handle,&(nuonEnv.mainBusDRAM[sectionhdr.s_paddr & MAIN_BUS_VALID_MEMORY_MASK]),sectionhdr.s_size);
         }
       }
       else
@@ -138,20 +143,20 @@ bool MPE::LoadCoffFile(const char * const filename, bool bSetEntryPoint, int han
           for(int i = 0; i < 16; i++)
             nuonEnv.systemBusDRAM[(sectionhdr.s_paddr & SYSTEM_BUS_VALID_MEMORY_MASK) + i] = 0;
 
-          _lseek(handle,16,SEEK_CUR);
-          _read(handle,&(nuonEnv.systemBusDRAM[(sectionhdr.s_paddr & SYSTEM_BUS_VALID_MEMORY_MASK) + 16]),sectionhdr.s_size - 16);
+          lseek(handle,16,SEEK_CUR);
+          read(handle,&(nuonEnv.systemBusDRAM[(sectionhdr.s_paddr & SYSTEM_BUS_VALID_MEMORY_MASK) + 16]),sectionhdr.s_size - 16);
         }
         else
         {
-          _read(handle,&(nuonEnv.systemBusDRAM[(sectionhdr.s_paddr & SYSTEM_BUS_VALID_MEMORY_MASK)]),sectionhdr.s_size);
+          read(handle,&(nuonEnv.systemBusDRAM[(sectionhdr.s_paddr & SYSTEM_BUS_VALID_MEMORY_MASK)]),sectionhdr.s_size);
         }
       }
 
       coffhdr.f_nscns--;
-      _lseek(handle,nextPos,SEEK_SET);
+      lseek(handle,nextPos,SEEK_SET);
     }
 
-    _close(handle);
+    close(handle);
 
     if(bSetEntryPoint)
     {

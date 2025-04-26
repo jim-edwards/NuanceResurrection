@@ -1044,7 +1044,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\nativecodecache.h"
+				RelativePath=".\NativeCodeCache.h"
 				>
 			</File>
 			<File

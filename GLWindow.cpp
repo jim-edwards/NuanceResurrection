@@ -1,9 +1,7 @@
 #include "basetypes.h"
-#include <windows.h>
 #include <process.h>
-#include <tchar.h>
 #include <mutex>
-#include "external\glew-2.2.0\include\GL\glew.h"
+#include "external/glew-2.2.0/include/GL/glew.h"
 #include <GL/gl.h>
 #include "GLWindow.h"
 #include "NuanceMain.h"
